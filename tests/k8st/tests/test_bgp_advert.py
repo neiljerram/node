@@ -103,9 +103,6 @@ class TestBGPAdvert(TestBase):
 
         start_external_node_with_bgp("kube-node-extra", bird_conf)
 
-        # Create nginx deployment and service
-        self.create_service("nginx:1.7.9", "nginx", "bgp-test", 80)
-
         # set CALICO_ADVERTISE_CLUSTER_IPS=10.96.0.0/12
         config.load_kube_config(os.environ.get('KUBECONFIG'))
         api = client.AppsV1Api(client.ApiClient())
@@ -157,8 +154,10 @@ EOF
         Test that BGP routes to services are exported over BGP
         """
 
-        # # Test access to nginx svc from kube-node-extra
+        # Create nginx deployment and service
+        self.create_service("nginx:1.7.9", "nginx", "bgp-test", 80)
 
+        # Test access to nginx svc from kube-node-extra
         def test():
             run("docker exec kube-node-extra ip r")
             # Assert that a route to the service IP range is present
@@ -169,3 +168,17 @@ EOF
                 "$(kubectl get svc nginx -n bgp-test -o json | jq -r .spec.clusterIP)")
 
         retry_until_success(test, retries=6, wait_time=10)
+
+    def test_perf(self):
+        """
+        Test how long it takes to create 1000 services and have their routes advertised.
+        """
+
+        for ii in range(1000):
+            self.create_service("nginx:1.7.9",
+                                "nginx%d" % ii,
+                                "bgp-test",
+                                10000+ii,
+                                service_type="NodePort",
+                                external_traffic_policy="Local")
+            run("docker exec kube-node-extra ip r | grep 10.96")

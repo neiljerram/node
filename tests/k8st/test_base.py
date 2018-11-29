@@ -109,7 +109,9 @@ class TestBase(TestCase):
     def create_namespace(self, ns_name):
         self.cluster.create_namespace(client.V1Namespace(metadata=client.V1ObjectMeta(name=ns_name)))
 
-    def create_service(self, image, name, ns, port, replicas=2):
+    def create_service(self, image, name, ns, port, replicas=2,
+                       service_type=None,
+                       external_traffic_policy=None):
         cluster = self.k8s_client()
         cluster.create_namespace(client.V1Namespace(metadata=client.V1ObjectMeta(name=ns)))
 
@@ -145,6 +147,10 @@ class TestBase(TestCase):
                 "selector": {"app": name},
             }
         )
+        if service_type is not None:
+            service.spec["type"] = service_type
+        if external_traffic_policy is not None:
+            service.spec["externalTrafficPolicy"] = external_traffic_policy
         api_response = cluster.create_namespaced_service(
             body=service,
             namespace=ns,
